@@ -156,11 +156,11 @@ _Use_decl_annotations_ INT_PTR CALLBACK MainDialogProc(HWND hwndDlg, UINT uMsg, 
                     abort();
                 }
 
-                int len = ListBox_GetTextLen(hwndProfileList, profileIndex) + 1;
+                int len = ListBox_GetTextLen(hwndProfileList, profileIndex);
                 if (len == LB_ERR) {
                     abort();
-                }
-                std::vector<WCHAR> profileName(len);
+                }                
+                std::vector<WCHAR> profileName(len + 1);
 
                 LRESULT rcl = ListBox_GetText(hwndProfileList, profileIndex, profileName.data());
                 if (rcl == LB_ERR) {
