@@ -128,7 +128,7 @@ _Use_decl_annotations_ INT_PTR CALLBACK MainDialogProc(HWND hwndDlg, UINT uMsg, 
                 }
             }
             
-            // Fallthrough.
+            break;
         case IDCANCEL:
             EndDialog(hwndDlg, wParam);
             return TRUE;
