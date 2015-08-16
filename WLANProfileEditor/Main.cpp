@@ -4,6 +4,8 @@
 #include <objbase.h>
 #include <wlanapi.h>
 
+#include <vector>
+
 #include "resource.h"
 
 #pragma comment(lib, "wlanapi")
@@ -15,13 +17,13 @@ _Use_decl_annotations_ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevI
 {
     HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
     if (FAILED(hr)) {
-        __debugbreak();        
+        abort();
     }
 
     INT_PTR result = DialogBox(hInstance, MAKEINTRESOURCE(IDD_MAIN_DIALOG), nullptr, MainDialogProc);
 
     if (result <= 0) {
-        __debugbreak();
+        abort();
     }
 
     CoUninitialize();
@@ -40,25 +42,29 @@ _Use_decl_annotations_ INT_PTR CALLBACK MainDialogProc(HWND hwndDlg, UINT uMsg, 
             DWORD negotiationVersion{};
             DWORD rc = WlanOpenHandle(WLAN_API_VERSION, nullptr, &negotiationVersion, &hClientHandle);
             if (rc != ERROR_SUCCESS) {
-                __debugbreak();
-                EndDialog(hwndDlg, IDCANCEL);
-                return FALSE;
+                abort();
             }
-
             
             rc = WlanEnumInterfaces(hClientHandle, nullptr, &interfaceList);
             if (rc != ERROR_SUCCESS) {
-                __debugbreak();
-                EndDialog(hwndDlg, IDCANCEL);
-                return FALSE;
+                abort();
             }
 
             // Populate list with interfaces
             HWND hwndInterfaceList = GetDlgItem(hwndDlg, IDC_INTERFACE_LIST);
+            if (hwndInterfaceList == nullptr) {
+                abort();
+            }
                         
             for (DWORD i = 0; i < interfaceList->dwNumberOfItems; ++i) {                           
                 int interfaceIndex = ListBox_AddString(hwndInterfaceList, interfaceList->InterfaceInfo[i].strInterfaceDescription);
-                ListBox_SetItemData(hwndInterfaceList, interfaceIndex, &interfaceList->InterfaceInfo[i].InterfaceGuid);
+                if (interfaceIndex == LB_ERR || interfaceIndex == LB_ERRSPACE) {
+                    abort();
+                }
+                int rci = ListBox_SetItemData(hwndInterfaceList, interfaceIndex, &interfaceList->InterfaceInfo[i].InterfaceGuid);
+                if (rci == LB_ERR) {
+                    abort();
+                }
             }            
         }
         break;
@@ -67,7 +73,10 @@ _Use_decl_annotations_ INT_PTR CALLBACK MainDialogProc(HWND hwndDlg, UINT uMsg, 
             WlanFreeMemory(interfaceList);
         }
         if (hClientHandle) {
-            WlanCloseHandle(hClientHandle, nullptr);
+            DWORD rc = WlanCloseHandle(hClientHandle, nullptr);
+            if (rc != ERROR_SUCCESS) {
+                abort();
+            }
             hClientHandle = nullptr;
         }     
         break;
@@ -78,20 +87,38 @@ _Use_decl_annotations_ INT_PTR CALLBACK MainDialogProc(HWND hwndDlg, UINT uMsg, 
             case LBN_SELCHANGE:
                 {
                     HWND hwndInterfaceList = GetDlgItem(hwndDlg, IDC_INTERFACE_LIST);
+                    if (hwndInterfaceList == nullptr) {
+                        abort();
+                    }
                     HWND hwndProfileList = GetDlgItem(hwndDlg, IDC_PROFILE_LIST);
+                    if (hwndProfileList == nullptr) {
+                        abort();
+                    }
 
                     int interfaceIndex = ListBox_GetCurSel(hwndInterfaceList);
-                    LPGUID interfaceGuid = reinterpret_cast<LPGUID>(ListBox_GetItemData(hwndInterfaceList, interfaceIndex));
-
+                    if (interfaceIndex == LB_ERR) {
+                        abort();
+                    }
+                    LRESULT itemData = ListBox_GetItemData(hwndInterfaceList, interfaceIndex);
+                    if (itemData == LB_ERR) {
+                        abort();
+                    }
+                    LPGUID interfaceGuid = reinterpret_cast<LPGUID>(itemData);
+                    
                     PWLAN_PROFILE_INFO_LIST profileList = nullptr;
                     DWORD rc = WlanGetProfileList(hClientHandle, interfaceGuid, nullptr, &profileList);
                     if (rc != ERROR_SUCCESS) {
-                        __debugbreak();
+                        abort();
                     }
 
                     ListBox_ResetContent(hwndProfileList);
+                    LRESULT rcl;
                     for (DWORD i = 0; i < profileList->dwNumberOfItems; ++i) {
-                        ListBox_AddString(hwndProfileList, profileList->ProfileInfo[i].strProfileName);
+                        rcl = ListBox_AddString(hwndProfileList, profileList->ProfileInfo[i].strProfileName);
+                        if (rcl == LB_ERR || rcl == LB_ERRSPACE) {
+                            abort();
+                        }
+
                     }
 
                     WlanFreeMemory(profileList);
@@ -102,35 +129,60 @@ _Use_decl_annotations_ INT_PTR CALLBACK MainDialogProc(HWND hwndDlg, UINT uMsg, 
         case IDC_PROFILE_LIST:            
             break;
         case IDOK:
-            // TODO: trigger edit profile
             {
                 HWND hwndInterfaceList = GetDlgItem(hwndDlg, IDC_INTERFACE_LIST);
+                if (hwndInterfaceList == nullptr) {
+                    abort();
+                }
                 HWND hwndProfileList = GetDlgItem(hwndDlg, IDC_PROFILE_LIST);
+                if (hwndProfileList == nullptr) {
+                    abort();
+                }
 
                 int interfaceIndex = ListBox_GetCurSel(hwndInterfaceList);
-                LPGUID interfaceGuid = reinterpret_cast<LPGUID>(ListBox_GetItemData(hwndInterfaceList, interfaceIndex));
+                if (interfaceIndex == LB_ERR) {
+                    abort();
+                }
+
+                LRESULT itemData = ListBox_GetItemData(hwndInterfaceList, interfaceIndex);
+                if (itemData == LB_ERR) {
+                    abort();
+                }
+
+                LPGUID interfaceGuid = reinterpret_cast<LPGUID>(itemData);
 
                 int profileIndex = ListBox_GetCurSel(hwndProfileList);
                 if (profileIndex == LB_ERR) {
-                    __debugbreak();
-                }
-                WCHAR* profileName = (WCHAR*)malloc((ListBox_GetTextLen(hwndProfileList, profileIndex) + 1) * sizeof(WCHAR));
-                if (!profileName) {
-                    __debugbreak();
+                    abort();
                 }
 
-                ListBox_GetText(hwndProfileList, profileIndex, profileName);
+                int len = ListBox_GetTextLen(hwndProfileList, profileIndex) + 1;
+                if (len == LB_ERR) {
+                    abort();
+                }
+                std::vector<WCHAR> profileName(len);
+
+                LRESULT rcl = ListBox_GetText(hwndProfileList, profileIndex, profileName.data());
+                if (rcl == LB_ERR) {
+                    abort();
+                }
 
                 WLAN_REASON_CODE reasonCode = 0;
-                DWORD rc = WlanUIEditProfile(WLAN_UI_API_VERSION, profileName, interfaceGuid, hwndDlg, WLSecurityPage, nullptr, &reasonCode);
+                DWORD rc = WlanUIEditProfile(WLAN_UI_API_VERSION, profileName.data(), interfaceGuid, hwndDlg, WLSecurityPage, nullptr, &reasonCode);
                 if (rc != ERROR_SUCCESS) {
-                    __debugbreak();
+                    abort();
                 }
             }
             
             break;
         case IDCANCEL:
-            EndDialog(hwndDlg, wParam);
+            {
+                BOOL rc = EndDialog(hwndDlg, wParam);
+                if (rc == FALSE) {
+                    abort();
+                }
+            }
+            
             return TRUE;
         }
         break;
